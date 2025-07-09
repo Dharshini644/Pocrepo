@@ -1,0 +1,51 @@
+name: CI/CD for Java App (Minikube Local)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 🔷 Checkout the code
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 🔷 Set up Java
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+
+    # 🔷 Build the JAR with Gradle
+    - name: Build with Gradle
+      run: ./gradlew :app:clean :app:build
+
+    # ⚠️ From here on it assumes Minikube & kubectl are available in your runner!
+    # Typically, Minikube is not available in GitHub-hosted runners by default.
+
+    - name: Start Minikube
+      run: |
+        minikube start --driver=docker --memory=1800mb
+
+    - name: Point Docker to Minikube
+      run: |
+        eval $(minikube docker-env)
+
+    - name: Build Docker image in Minikube
+      run: |
+        docker build -t java-app:1.0.0 .
+
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl apply -f k8s/deployment-definition.yml
+        kubectl apply -f k8s/service-definition.yml
+
+    - name: Check pods
+      run: |
+        kubectl get pods
